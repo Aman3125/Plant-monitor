@@ -31,7 +31,7 @@ Plants need the right amount of light and the right temperature to stay healthy.
 ```mermaid
 flowchart LR
     A[Sensors<br/>DHT11 · Photoresistor] --> B[Raspberry Pi]
-    B -- MQTT every ~10s --> C[FastAPI website<br/>on AWS]
+    B --  every ~10s --> C[FastAPI website<br/>on AWS]
     C --> D[(Database)]
     C -- alert command --> B
     B --> E[Red LED + Buzzer<br/>or Green LED]
