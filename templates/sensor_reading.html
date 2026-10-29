@@ -1,0 +1,15 @@
+{% extends "layout.html" %} {% block content %}
+{% set badge = "bg-success" if status == "OK" else "bg-danger" %}
+<article class="content-section py-3 px-4 mb-4">
+  <div class="flex-grow-1">
+    <div class="article-metadata mb-2">
+      <a class="me-2" href="{{ url_for("user_readings", user_id=sensor_reading.author.id) }}">{{ sensor_reading.author.username }}</a>
+      <small class="text-body-secondary">{{ sensor_reading.date_timestamp.strftime("%d %B, %Y %H:%M:%S") }}</small>
+    </div>
+    <h2 class="article-title text-capitalize">{{ sensor_reading.sensor }}</h2>
+    <p class="article-content display-6">{{ "%.1f"|format(sensor_reading.content) }} {{ unit }}</p>
+    <span class="badge {{ badge }}">{{ status }}</span>
+  </div>
+</article>
+<a class="btn btn-outline-secondary" href="{{ url_for("home") }}">Back to dashboard</a>
+{% endblock content %}

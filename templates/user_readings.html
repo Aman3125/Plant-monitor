@@ -1,0 +1,26 @@
+{% extends "layout.html" %} {% block content %}
+<h1 class="mb-4">Readings by {{ user.username }}</h1>
+{% for reading in readings %}
+<article class="content-section py-3 px-4 mb-3">
+  <div class="flex-grow-1">
+    <div class="article-metadata mb-2">
+      <a
+        class="me-2"
+        href="{{ url_for('user_readings', user_id=reading.author.id) }}"
+        >{{ reading.author.username }}</a
+      >
+      <small class="text-body-secondary"
+        >{{ reading.date_timestamp.strftime("%d %B, %Y %H:%M") }}</small
+      >
+    </div>
+    <h4 class="mb-1">
+      <a class="article-title text-capitalize" href="{{ url_for('sensor_reading_page', sensor_reading_id=reading.id) }}"
+        >{{ reading.sensor }}</a
+      >
+    </h4>
+    <p class="article-content mb-0">{{ "%.1f"|format(reading.content) }} {{ sensors[reading.sensor].unit }}</p>
+  </div>
+</article>
+{% else %}
+<p class="text-body-secondary">No readings from this user yet.</p>
+{% endfor %} {% endblock content %}

@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h1 class="mb-4">Plant Monitor</h1>
+
+  <!-- Latest reading for each sensor -->
+  <div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
+    {% for item in latest %}
+      {% set badge = "bg-success" if item.status == "OK" else ("bg-secondary" if item.status == "No data" else "bg-danger") %}
+      <div class="col">
+        <div class="content-section py-3 px-3 h-100 text-center">
+          <h5 class="text-capitalize">{{ item.sensor }}</h5>
+          {% if item.reading %}
+            <p class="display-6 mb-2">{{ "%.1f"|format(item.reading.content) }} {{ item.unit }}</p>
+          {% else %}
+            <p class="display-6 mb-2">--</p>
+          {% endif %}
+          <span class="badge {{ badge }}">{{ item.status }}</span>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h2 class="mb-3">Recent readings</h2>
+  {% for sensor_reading in sensor_readings %}
+    <article class="content-section py-3 px-4 mb-3">
+      <div class="flex-grow-1">
+        <div class="article-metadata mb-2">
+          <a class="me-2" href="{{url_for('user_readings', user_id=sensor_reading.author.id)}}">{{ sensor_reading.author.username }}</a>
+          <small class="text-body-secondary">{{ sensor_reading.date_timestamp.strftime('%d %B, %Y %H:%M') }}</small>
+        </div>
+        <h4 class="mb-1">
+          <a class="article-title text-capitalize"
+             href="{{ url_for("sensor_reading_page", sensor_reading_id=sensor_reading.id) }}">{{ sensor_reading.sensor }}</a>
+        </h4>
+        <p class="article-content mb-0">{{ "%.1f"|format(sensor_reading.content) }} {{ sensors[sensor_reading.sensor].unit }}</p>
+      </div>
+    </article>
+  {% else %}
+    <p class="text-body-secondary">No readings yet. Run <code>python seed.py</code> to add some fake ones.</p>
+  {% endfor %}
+{% endblock content %}

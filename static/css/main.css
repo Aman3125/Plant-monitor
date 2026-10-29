@@ -1,0 +1,23 @@
+/* Space for the fixed navbar */
+body {
+  padding-top: 5rem;
+}
+
+.bg-steel {
+  background-color: #527c9f;
+}
+
+/* Boxes used for cards, readings and the sidebar */
+.content-section {
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+}
+
+.article-title {
+  text-decoration: none;
+}
+
+.article-title:hover {
+  text-decoration: underline;
+}
