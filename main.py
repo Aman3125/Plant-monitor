@@ -110,6 +110,11 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
     )
 
 
+@app.get("/sensor/temperature", include_in_schema=False, name="temperature_page")
+def temperature_page(request: Request, db: Annotated[Session, Depends(get_db)]):
+    return render_sensor_table(request, db, "temperature")
+
+
 @app.get("/sensor_reading/{sensor_reading_id}", include_in_schema=False)
 def sensor_reading_page(request: Request, sensor_reading_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == sensor_reading_id))
