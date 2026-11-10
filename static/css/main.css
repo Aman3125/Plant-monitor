@@ -14,6 +14,17 @@ body {
   border-radius: 0.5rem;
 }
 
+/* Underline the tab for the page you are on */
+.navbar .nav-link.active {
+  font-weight: 600;
+  border-bottom: 2px solid #fff;
+}
+
+/* Let the tables use the same background as the boxes around them */
+.content-section .table {
+  --bs-table-bg: transparent;
+}
+
 .article-title {
   text-decoration: none;
 }

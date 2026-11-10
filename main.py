@@ -42,6 +42,40 @@ def get_status(sensor: str, value: float) -> str:
     return "OK"
 
 
+def render_sensor_table(request: Request, db: Session, sensor_name: str):
+    """Show every reading for one sensor in a table, with a short summary on top."""
+    info = SENSORS[sensor_name]
+    result = db.execute(
+        select(models.Reading)
+        .where(models.Reading.sensor == sensor_name)
+        .order_by(models.Reading.date_timestamp.desc(), models.Reading.id.desc())
+    )
+    readings = result.scalars().all()
+    rows = [{"reading": r, "status": get_status(sensor_name, r.content)} for r in readings]
+
+    summary = None
+    if readings:
+        values = [r.content for r in readings]
+        summary = {
+            "latest": values[0],
+            "lowest": min(values),
+            "highest": max(values),
+            "average": sum(values) / len(values),
+        }
+
+    return templates.TemplateResponse(
+        request,
+        "sensor_table.html",
+        {
+            "sensor": sensor_name,
+            "info": info,
+            "rows": rows,
+            "summary": summary,
+            "title": sensor_name.capitalize(),
+        },
+    )
+
+
 @app.get("/", include_in_schema=False, name="home")
 @app.get("/sensor_readings", include_in_schema=False, name="sensor_readings")
 def home(request: Request, db: Annotated[Session, Depends(get_db)]):

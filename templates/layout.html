@@ -42,10 +42,20 @@
             <span class="navbar-toggler-icon"></span>
           </button>
           <div class="collapse navbar-collapse" id="navbarToggle">
+            {% set current_path = request.url.path %}
+            {# Each sensor table gets its own tab here #}
+            {% set nav_tabs = [
+              ("Home", url_for("home").path),
+            ] %}
             <div class="navbar-nav me-auto">
-              <a class="nav-link active"
-                 aria-current="page"
-                 href="{{ url_for("home") }}">Home</a>
+              {% for label, path in nav_tabs %}
+                {% set is_active = current_path == path
+                   or (label == "Home" and current_path == "/sensor_readings")
+                   or (sensor_reading is defined and label|lower == sensor_reading.sensor) %}
+                <a class="nav-link{% if is_active %} active{% endif %}"
+                   {% if is_active %}aria-current="page"{% endif %}
+                   href="{{ path }}">{{ label }}</a>
+              {% endfor %}
             </div>
             <!-- Navbar Right Side -->
             <div class="navbar-nav">
