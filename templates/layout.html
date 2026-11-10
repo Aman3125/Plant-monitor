@@ -47,6 +47,7 @@
             {% set nav_tabs = [
               ("Home", url_for("home").path),
               ("Temperature", url_for("temperature_page").path),
+              ("Humidity", url_for("humidity_page").path),
             ] %}
             <div class="navbar-nav me-auto">
               {% for label, path in nav_tabs %}
