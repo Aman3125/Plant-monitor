@@ -120,6 +120,11 @@ def humidity_page(request: Request, db: Annotated[Session, Depends(get_db)]):
     return render_sensor_table(request, db, "humidity")
 
 
+@app.get("/sensor/light", include_in_schema=False, name="light_page")
+def light_page(request: Request, db: Annotated[Session, Depends(get_db)]):
+    return render_sensor_table(request, db, "light")
+
+
 @app.get("/sensor_reading/{sensor_reading_id}", include_in_schema=False)
 def sensor_reading_page(request: Request, sensor_reading_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == sensor_reading_id))
