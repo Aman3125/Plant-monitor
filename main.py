@@ -6,12 +6,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from schemas import ReadingCreate, ReadingResponse, UserCreate, UserResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from schemas import ReadingCreate, ReadingResponse, Token, UserCreate, UserResponse
 from typing import Annotated
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import models
-from auth import hash_password
+from auth import DUMMY_HASH, create_access_token, hash_password, verify_password
 from database import Base, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -228,6 +229,21 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     return new_user
 
 
+@app.post("/api/token", response_model=Token)
+def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(models.User).where(models.User.username == form_data.username))
+    user = result.scalars().first()
+    # Always check a hash, even for an unknown username, so both cases take the same time
+    password_ok = verify_password(form_data.password, user.password_hash if user else DUMMY_HASH)
+    if not user or not password_ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return Token(access_token=create_access_token(user.username), token_type="bearer")
+
+
 @app.get("/api/user/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
@@ -269,7 +285,8 @@ def general_http_exception_handler(request: Request, exception: StarletteHTTPExc
     if request.url.path.startswith("/api"):
         return JSONResponse(
             status_code=exception.status_code,
-            content={"detail": message}
+            content={"detail": message},
+            headers=exception.headers,
         )
     return templates.TemplateResponse(
         request,
