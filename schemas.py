@@ -13,7 +13,7 @@ class ReadingBase(BaseModel):
 
 
 class ReadingCreate(ReadingBase):
-    user_id: int  # Temporary
+    pass
 
 
 class ReadingResponse(ReadingBase):

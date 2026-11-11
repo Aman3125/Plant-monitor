@@ -6,13 +6,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from schemas import ReadingCreate, ReadingResponse, Token, UserCreate, UserResponse
 from typing import Annotated
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import models
-from auth import DUMMY_HASH, create_access_token, hash_password, verify_password
+from auth import DUMMY_HASH, create_access_token, decode_access_token, hash_password, verify_password
 from database import Base, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,6 +33,31 @@ SENSORS = {
     "humidity": {"unit": "%", "low": 30, "high": 80},
     "light": {"unit": "%", "low": 20, "high": 100},
 }
+
+
+# API requests must send the token from /api/token as "Authorization: Bearer <token>"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
+
+
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+) -> models.User:
+    username = decode_access_token(token)
+    user = None
+    if username:
+        result = db.execute(select(models.User).where(models.User.username == username))
+        user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not logged in, or the login has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
 def get_status(sensor: str, value: float) -> str:
@@ -98,7 +123,7 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
             "status": get_status(name, reading.content) if reading else "No data",
         })
 
-    # The 20 most recent readings
+   
     result = db.execute(
         select(models.Reading)
         .order_by(models.Reading.date_timestamp.desc(), models.Reading.id.desc())
@@ -166,14 +191,14 @@ def user_readings_page(request: Request, user_id: int, db: Annotated[Session, De
 
 
 @app.get("/api/sensor_readings", response_model=list[ReadingResponse])
-def get_sensor_readings(db: Annotated[Session, Depends(get_db)]):
+def get_sensor_readings(current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading))
     sensor_readings = result.scalars().all()
     return sensor_readings
 
 
 @app.get("/api/sensor_reading/{sensor_reading_id}", response_model=ReadingResponse)
-def get_sensor_reading(sensor_reading_id: int, db: Annotated[Session, Depends(get_db)]):
+def get_sensor_reading(sensor_reading_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == sensor_reading_id))
     reading = result.scalars().first()
     if reading:
@@ -182,15 +207,12 @@ def get_sensor_reading(sensor_reading_id: int, db: Annotated[Session, Depends(ge
 
 
 @app.post("/api/reading", response_model=ReadingResponse, status_code=status.HTTP_201_CREATED)
-def create_reading(reading: ReadingCreate, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(models.User).where(models.User.id == reading.user_id))
-    user = result.scalars().first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+def create_reading(reading: ReadingCreate, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
+    # The reading belongs to whoever is logged in, not to a user_id sent in the request
     new_reading = models.Reading(
         sensor=reading.sensor,
         content=reading.content,
-        user_id=reading.user_id
+        user_id=current_user.id
     )
     db.add(new_reading)
     db.commit()
@@ -199,11 +221,13 @@ def create_reading(reading: ReadingCreate, db: Annotated[Session, Depends(get_db
 
 
 @app.delete("/api/reading/{reading_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_reading(reading_id: int, db: Annotated[Session, Depends(get_db)]):
+def delete_reading(reading_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == reading_id))
     reading = result.scalars().first()
     if not reading:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reading not found")
+    if reading.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own readings")
     db.delete(reading)
     db.commit()
 
@@ -244,8 +268,13 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Annota
     return Token(access_token=create_access_token(user.username), token_type="bearer")
 
 
+@app.get("/api/user/me", response_model=UserResponse)
+def get_me(current_user: CurrentUser):
+    return current_user
+
+
 @app.get("/api/user/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+def get_user(user_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
     if user:
@@ -255,7 +284,7 @@ def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
 
 # Endpoint for getting all readings by a specific user
 @app.get("/api/user/{user_id}/readings", response_model=list[ReadingResponse])
-def get_user_readings(user_id: int, db: Annotated[Session, Depends(get_db)]):
+def get_user_readings(user_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
     if not user:
@@ -266,11 +295,13 @@ def get_user_readings(user_id: int, db: Annotated[Session, Depends(get_db)]):
 
 
 @app.delete("/api/user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+def delete_user(user_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own account")
     db.delete(user)
     db.commit()
 

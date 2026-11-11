@@ -30,3 +30,12 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def create_access_token(username: str) -> str:
     expires = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode({"sub": username, "exp": expires}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_access_token(token: str) -> str | None:
+    """Return the username in a token, or None if it is fake or has expired."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        return None
+    return payload.get("sub")
