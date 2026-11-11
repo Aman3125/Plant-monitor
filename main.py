@@ -11,6 +11,7 @@ from typing import Annotated
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 import models
+from auth import hash_password
 from database import Base, engine, get_db
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -218,7 +219,8 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
     new_user = models.User(
         username=user.username,
-        email=user.email
+        email=user.email,
+        password_hash=hash_password(user.password),
     )
     db.add(new_user)
     db.commit()

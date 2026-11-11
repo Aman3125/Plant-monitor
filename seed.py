@@ -3,16 +3,21 @@
 Run it once with:  python seed.py
 Later, the Raspberry Pi will send real readings through MQTT instead.
 """
+import os
 import random
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
 import models
+from auth import hash_password
 from database import Base, SessionLocal, engine
 
 Base.metadata.create_all(bind=engine)
 random.seed(1)
+
+# Password for the test user. Set PLANT_PI_PASSWORD to choose your own.
+PLANT_PI_PASSWORD = os.environ.get("PLANT_PI_PASSWORD", "plantpi-test-1")
 
 with SessionLocal() as db:
     if db.execute(select(models.Reading)).first():
@@ -21,7 +26,8 @@ with SessionLocal() as db:
 
     user = db.execute(select(models.User).where(models.User.username == "plant_pi")).scalars().first()
     if not user:
-        user = models.User(username="plant_pi", email="plantpi@example.com")
+        user = models.User(username="plant_pi", email="plantpi@example.com",
+                           password_hash=hash_password(PLANT_PI_PASSWORD))
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -42,4 +48,4 @@ with SessionLocal() as db:
     db.add(models.Reading(sensor="temperature", content=32.5, user_id=user.id, date_timestamp=now))
 
     db.commit()
-    print("Added a user (plant_pi) and fake readings.")
+    print(f"Added a user (plant_pi, password: {PLANT_PI_PASSWORD}) and fake readings.")

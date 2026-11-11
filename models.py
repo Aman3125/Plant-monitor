@@ -11,6 +11,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
+    # Argon2 hash of the password, never the password itself
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     readings: Mapped[list[Reading]] = relationship(back_populates="author",
                                                    cascade="all, delete-orphan")
