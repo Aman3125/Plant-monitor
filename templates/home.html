@@ -1,10 +1,12 @@
 {% extends "layout.html" %}
+{# The dashboard page #}
 {% block content %}
   <h1 class="mb-4">Plant Monitor</h1>
 
   <!-- Latest reading for each sensor -->
   <div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
     {% for item in latest %}
+      {# Green badge when OK, grey with no data, red when out of range #}
       {% set badge = "bg-success" if item.status == "OK" else ("bg-secondary" if item.status == "No data" else "bg-danger") %}
       <div class="col">
         <div class="content-section py-3 px-3 h-100 text-center">
@@ -20,6 +22,7 @@
     {% endfor %}
   </div>
 
+  <!-- The 20 newest readings from all sensors -->
   <h2 class="mb-3">Recent readings</h2>
   {% for sensor_reading in sensor_readings %}
     <article class="content-section py-3 px-4 mb-3">

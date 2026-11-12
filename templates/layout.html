@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- The shared layout: every page fills in the content block below -->
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -31,7 +32,9 @@
       <nav class="navbar navbar-expand-md bg-steel fixed-top"
            data-bs-theme="dark">
         <div class="container">
+          <!-- Site name, links back to the dashboard -->
           <a class="navbar-brand me-4" href="{{ url_for("sensor_readings") }}">Plant Monitor</a>
+          <!-- Menu button shown on small screens -->
           <button class="navbar-toggler"
                   type="button"
                   data-bs-toggle="collapse"
@@ -43,7 +46,7 @@
           </button>
           <div class="collapse navbar-collapse" id="navbarToggle">
             {% set current_path = request.url.path %}
-            {# Each sensor table gets its own tab here #}
+            {# Navigation tabs. Each sensor table gets its own tab here #}
             {% set nav_tabs = [
               ("Home", url_for("home").path),
               ("Temperature", url_for("temperature_page").path),
@@ -91,10 +94,12 @@
 
     <main role="main" class="container">
       <div class="row">
+        <!-- Each page's own content goes here -->
         <div class="col-md-8">
           {% block content %}
           {% endblock content %}
         </div>
+        <!-- Sidebar with information about the project -->
         <aside class="col-md-4">
           <div class="content-section py-3 px-4 mb-4">
             <h3>About</h3>
@@ -109,6 +114,7 @@
       </div>
     </main>
 
+    <!-- Footer -->
     <footer class="mt-auto py-3 bg-body-tertiary border-top">
       <div class="container text-center">
         <p class="text-body-secondary mb-0">

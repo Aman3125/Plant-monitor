@@ -19,10 +19,12 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 
+# Make the database tables if they do not exist yet
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# Serve the CSS from /static and the HTML pages from the templates folder
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -35,6 +37,7 @@ SENSORS = {
 }
 
 
+# Find the logged-in user from the token sent with an API request.
 # API requests must send the token from /api/token as "Authorization: Bearer <token>"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
@@ -57,9 +60,11 @@ def get_current_user(
     return user
 
 
+# Add "current_user: CurrentUser" to a route to make it need a login
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
+# Compare a reading with the healthy range: "Too low", "Too high" or "OK"
 def get_status(sensor: str, value: float) -> str:
     limits = SENSORS[sensor]
     if value < limits["low"]:
@@ -69,6 +74,7 @@ def get_status(sensor: str, value: float) -> str:
     return "OK"
 
 
+# Shared code that builds the table page for any one sensor
 def render_sensor_table(request: Request, db: Session, sensor_name: str):
     """Show every reading for one sensor in a table, with a short summary on top."""
     info = SENSORS[sensor_name]
@@ -103,6 +109,9 @@ def render_sensor_table(request: Request, db: Session, sensor_name: str):
     )
 
 
+# ----- Web pages -----
+
+# The dashboard: latest value of each sensor and the 20 newest readings
 @app.get("/", include_in_schema=False, name="home")
 @app.get("/sensor_readings", include_in_schema=False, name="sensor_readings")
 def home(request: Request, db: Annotated[Session, Depends(get_db)]):
@@ -124,6 +133,7 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
         })
 
    
+    # The 20 newest readings from all sensors
     result = db.execute(
         select(models.Reading)
         .order_by(models.Reading.date_timestamp.desc(), models.Reading.id.desc())
@@ -137,6 +147,7 @@ def home(request: Request, db: Annotated[Session, Depends(get_db)]):
     )
 
 
+# One page per sensor, each using render_sensor_table()
 @app.get("/sensor/temperature", include_in_schema=False, name="temperature_page")
 def temperature_page(request: Request, db: Annotated[Session, Depends(get_db)]):
     return render_sensor_table(request, db, "temperature")
@@ -152,6 +163,7 @@ def light_page(request: Request, db: Annotated[Session, Depends(get_db)]):
     return render_sensor_table(request, db, "light")
 
 
+# Page for one single reading
 @app.get("/sensor_reading/{sensor_reading_id}", include_in_schema=False)
 def sensor_reading_page(request: Request, sensor_reading_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == sensor_reading_id))
@@ -171,6 +183,7 @@ def sensor_reading_page(request: Request, sensor_reading_id: int, db: Annotated[
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sensor reading not found")
 
 
+# Page listing every reading sent by one user
 @app.get("/user/{user_id}/readings", include_in_schema=False, name="user_readings")
 def user_readings_page(request: Request, user_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
@@ -190,6 +203,11 @@ def user_readings_page(request: Request, user_id: int, db: Annotated[Session, De
     )
 
 
+# ----- JSON API -----
+
+# Every API route from here needs a login token, except register and login
+
+# Get all readings
 @app.get("/api/sensor_readings", response_model=list[ReadingResponse])
 def get_sensor_readings(current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading))
@@ -197,6 +215,7 @@ def get_sensor_readings(current_user: CurrentUser, db: Annotated[Session, Depend
     return sensor_readings
 
 
+# Get one reading by its id
 @app.get("/api/sensor_reading/{sensor_reading_id}", response_model=ReadingResponse)
 def get_sensor_reading(sensor_reading_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == sensor_reading_id))
@@ -206,6 +225,7 @@ def get_sensor_reading(sensor_reading_id: int, current_user: CurrentUser, db: An
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sensor reading not found")
 
 
+# Save a new reading (this is what the Raspberry Pi will call)
 @app.post("/api/reading", response_model=ReadingResponse, status_code=status.HTTP_201_CREATED)
 def create_reading(reading: ReadingCreate, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     # The reading belongs to whoever is logged in, not to a user_id sent in the request
@@ -220,22 +240,26 @@ def create_reading(reading: ReadingCreate, current_user: CurrentUser, db: Annota
     return new_reading
 
 
+# Delete a reading
 @app.delete("/api/reading/{reading_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_reading(reading_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.Reading).where(models.Reading.id == reading_id))
     reading = result.scalars().first()
     if not reading:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reading not found")
+    # Only the owner can delete a reading
     if reading.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own readings")
     db.delete(reading)
     db.commit()
 
 
+# Register a new user (open to everyone, no token needed)
 @app.post("/api/user", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.username == user.username))
     existing_user = result.scalars().first()
+    # Usernames and emails must be unique
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
     result = db.execute(select(models.User).where(models.User.email == user.email))
@@ -245,7 +269,7 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     new_user = models.User(
         username=user.username,
         email=user.email,
-        password_hash=hash_password(user.password),
+        password_hash=hash_password(user.password),  # Save only the hash
     )
     db.add(new_user)
     db.commit()
@@ -253,6 +277,7 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     return new_user
 
 
+# Log in with a username and password to get a token back
 @app.post("/api/token", response_model=Token)
 def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.username == form_data.username))
@@ -268,11 +293,13 @@ def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Annota
     return Token(access_token=create_access_token(user.username), token_type="bearer")
 
 
+# Show who is logged in
 @app.get("/api/user/me", response_model=UserResponse)
 def get_me(current_user: CurrentUser):
     return current_user
 
 
+# Get one user by their id
 @app.get("/api/user/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
@@ -294,18 +321,23 @@ def get_user_readings(user_id: int, current_user: CurrentUser, db: Annotated[Ses
     return readings
 
 
+# Delete a user and all their readings
 @app.delete("/api/user/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Users can only delete their own account
     if user.id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own account")
     db.delete(user)
     db.commit()
 
 
+# ----- Error handling -----
+
+# Errors like 404: the API gets JSON, web pages get the error.html page
 @app.exception_handler(StarletteHTTPException)
 def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
     message = (
@@ -317,7 +349,7 @@ def general_http_exception_handler(request: Request, exception: StarletteHTTPExc
         return JSONResponse(
             status_code=exception.status_code,
             content={"detail": message},
-            headers=exception.headers,
+            headers=exception.headers,  # Keep WWW-Authenticate on 401 errors
         )
     return templates.TemplateResponse(
         request,
@@ -331,6 +363,7 @@ def general_http_exception_handler(request: Request, exception: StarletteHTTPExc
     )
 
 
+# Bad input (422): the API gets the details as JSON, web pages get a friendly message
 @app.exception_handler(RequestValidationError)
 def validation_exception_handler(request: Request, exception: RequestValidationError):
     if request.url.path.startswith("/api"):

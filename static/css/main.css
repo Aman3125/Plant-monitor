@@ -3,6 +3,7 @@ body {
   padding-top: 5rem;
 }
 
+/* Blue colour of the navigation bar */
 .bg-steel {
   background-color: #527c9f;
 }
@@ -25,6 +26,7 @@ body {
   --bs-table-bg: transparent;
 }
 
+/* Links that only underline when you hover over them */
 .article-title {
   text-decoration: none;
 }

@@ -13,17 +13,21 @@ import models
 from auth import hash_password
 from database import Base, SessionLocal, engine
 
+# Make the tables if they do not exist yet
 Base.metadata.create_all(bind=engine)
+# Same fake numbers every time the script runs
 random.seed(1)
 
 # Password for the test user. Set PLANT_PI_PASSWORD to choose your own.
 PLANT_PI_PASSWORD = os.environ.get("PLANT_PI_PASSWORD", "plantpi-test-1")
 
 with SessionLocal() as db:
+    # Stop if there is already data, so readings are not added twice
     if db.execute(select(models.Reading)).first():
         print("The database already has readings. Delete readings.db to start again.")
         raise SystemExit
 
+    # Make the plant_pi test user that owns all the fake readings
     user = db.execute(select(models.User).where(models.User.username == "plant_pi")).scalars().first()
     if not user:
         user = models.User(username="plant_pi", email="plantpi@example.com",

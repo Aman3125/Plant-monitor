@@ -19,19 +19,23 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 DUMMY_HASH = password_hash.hash("not-a-real-password")
 
 
+# Turn a password into an Argon2 hash before saving it
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
+# Check a typed password against the saved hash
 def verify_password(password: str, hashed_password: str) -> bool:
     return password_hash.verify(password, hashed_password)
 
 
+# Make a login token that lasts 30 minutes
 def create_access_token(username: str) -> str:
     expires = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode({"sub": username, "exp": expires}, SECRET_KEY, algorithm=ALGORITHM)
 
 
+# Read the username back out of a token
 def decode_access_token(token: str) -> str | None:
     """Return the username in a token, or None if it is fake or has expired."""
     try:

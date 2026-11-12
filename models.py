@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 
 
+# The user table: one row for each account
 class User(Base):
     __tablename__ = "user"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -14,17 +15,23 @@ class User(Base):
     # Argon2 hash of the password, never the password itself
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
+    # All readings by this user. Deleting the user also deletes their readings
     readings: Mapped[list[Reading]] = relationship(back_populates="author",
                                                    cascade="all, delete-orphan")
 
 
+# The reading table: one row for each value a sensor sends
 class Reading(Base):
     __tablename__ = "reading"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     # "temperature", "humidity" or "light"
     sensor: Mapped[str] = mapped_column(String(20), nullable=False)
+    # The value measured, e.g. 22.5 for temperature
     content: Mapped[float] = mapped_column(Float, nullable=False)
+    # The user (device) that sent the reading
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    # When the reading was saved, in UTC
     date_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                      default=lambda: datetime.now(UTC))
+    # Lets a reading look up its user, e.g. reading.author.username
     author: Mapped[User] = relationship(back_populates="readings")

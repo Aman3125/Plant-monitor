@@ -1,4 +1,5 @@
 {% extends "layout.html" %} {% block content %}
+{# Every reading sent by one user, newest first #}
 <h1 class="mb-4">Readings by {{ user.username }}</h1>
 {% for reading in readings %}
 <article class="content-section py-3 px-4 mb-3">

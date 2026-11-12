@@ -1,4 +1,6 @@
 {% extends "layout.html" %} {% block content %}
+{# Page for one single reading #}
+{# Green badge when OK, red when out of range #}
 {% set badge = "bg-success" if status == "OK" else "bg-danger" %}
 <article class="content-section py-3 px-4 mb-4">
   <div class="flex-grow-1">
